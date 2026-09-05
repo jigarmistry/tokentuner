@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokentuner"
+version = "0.1.0"
+description = "Cut tokens, cost and latency on LLM calls without changing what the model is asked."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Jigar Mistry" }]
+keywords = ["llm", "tokens", "cache", "prompt", "cost", "latency", "openai", "prompt-caching"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+# Deliberately empty. The whole point of this package is that it can be dropped
+# into any project without dragging a dependency tree behind it; everything it
+# needs beyond the stdlib is optional and degrades to a working fallback.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/jigarmistry/tokentuner"
+Repository = "https://github.com/jigarmistry/tokentuner"
+Issues = "https://github.com/jigarmistry/tokentuner/issues"
+
+[project.optional-dependencies]
+# Exact token counts instead of the built-in estimator.
+counting = ["tiktoken>=0.7"]
+# Persistent cache backends. SQLite needs nothing (stdlib).
+mongo = ["pymongo>=4"]
+redis = ["redis>=5"]
+all = ["tiktoken>=0.7", "pymongo>=4", "redis>=5"]
+
+[project.scripts]
+tokentuner = "tokentuner.report:main"
+
+[tool.setuptools.packages.find]
+include = ["tokentuner*"]

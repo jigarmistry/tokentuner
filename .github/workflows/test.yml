@@ -1,0 +1,52 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the floor declared in pyproject; 3.13 is the current release.
+        # Both ends are tested because the package promises to run on both.
+        python-version: ["3.9", "3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # No install step and no dependencies: the suite runs against the source
+      # tree exactly as a vendored copy would, which is how most people will
+      # actually use this.
+      - name: Run the test suite
+        run: python tests/test_tokentuner.py
+
+      - name: Run the example end to end
+        run: PYTHONPATH=. python examples/openai_basic.py
+
+      - name: Build the wheel and import it from a clean interpreter
+        run: |
+          python -m pip install --quiet --upgrade pip build
+          python -m build --wheel --outdir dist
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install --quiet dist/*.whl
+          /tmp/fresh/bin/python -c "import tokentuner; print(tokentuner.__version__)"
+          /tmp/fresh/bin/tokentuner --help > /dev/null
+
+      - name: Verify exact token counting when tiktoken is present
+        if: matrix.python-version == '3.11'
+        run: |
+          python -m pip install --quiet tiktoken
+          python -c "
+          from tokentuner import counting
+          assert counting.exact_counting_available(), 'tiktoken path not active'
+          print('exact counting OK')
+          "
+          python tests/test_tokentuner.py
