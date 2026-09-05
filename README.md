@@ -9,6 +9,80 @@ model to call and *above* the SDK that calls it.
 your app  ->  your routing/tiering layer  ->  tokentuner  ->  openai / openrouter / anything
 ```
 
+## How a call flows through it
+
+Two phases, in this order: make the request smaller, then try not to send it at
+all. The order matters — the cheapest possible outcome is always checked first.
+
+```mermaid
+flowchart TD
+    %% --- nodes are declared before they are connected, because mermaid puts a
+    %% --- node in whichever subgraph mentions it first
+    START(["your call site"])
+
+    subgraph SHAPE["1 &mdash; shape the request, so there is less to pay for"]
+        direction TB
+        S1["<b>PromptLayout</b><br>fixed instructions first, volatile data last,<br>so the provider has a prefix it can reuse"]
+        S2["<b>Budget / trim_history</b><br>token-aware cuts, whole turns only,<br>never an orphaned tool result"]
+        S3["<b>minify_rows / squeeze_text</b><br>compact the injected data;<br>the instructions are never touched"]
+        S1 --> S2 --> S3
+    end
+
+    GATE{"may this answer<br>be reused?"}
+    LOOK["<b>cache lookup</b><br>digest of model + messages + temperature<br>+ schema + tools, salted per tenant"]
+    FLY{"identical call<br>in flight right now?"}
+    CALL["<b>call the provider</b>"]
+    KEEP{"worth storing?"}
+    PUT["write to cache"]
+
+    HIT(["<b>HIT</b><br>0 tokens &middot; 0 ms"])
+    SHARE(["<b>SHARED</b><br>0 tokens &middot; waits on the leader"])
+    OUT(["<b>MISS</b><br>full price, on a smaller prompt"])
+    LED["<b>Ledger</b><br>counts what each mechanism saved, so the layer<br>can be justified or removed on evidence"]
+
+    %% --- 2. avoid sending it at all, cheapest outcome checked first
+    START --> S1
+    S3 --> GATE
+    GATE -->|no| CALL
+    GATE -->|yes| LOOK
+    LOOK -->|hit| HIT
+    LOOK -->|miss| FLY
+    FLY -->|yes| SHARE
+    FLY -->|no| CALL
+    CALL --> KEEP
+    KEEP -->|no| OUT
+    KEEP -->|yes| PUT
+    PUT --> OUT
+    HIT --> LED
+    SHARE --> LED
+    OUT --> LED
+
+    classDef free fill:#1a7f37,stroke:#1a7f37,color:#ffffff
+    classDef paid fill:#9a6700,stroke:#9a6700,color:#ffffff
+    classDef gate fill:#0969da,stroke:#0969da,color:#ffffff
+    class HIT,SHARE free
+    class OUT,CALL paid
+    class GATE,FLY,KEEP gate
+```
+
+**`may this answer be reused?`** is `no` when the temperature is above
+`cache_max_temperature`, when the call carries tools, when it streams, or when
+the task opted out. **`worth storing?`** is `no` when the call failed, when the
+response is oversized, or when the prompt carried personal data and the store is
+persistent without `cache_persist_sensitive`. Both are expanded under
+[What it refuses to cache](#what-it-refuses-to-cache).
+
+| Outcome | Provider call | Tokens billed | When |
+|---|---|---|---|
+| **HIT** | none | zero | the same call was answered before and is still within its TTL |
+| **SHARED** | none | zero | an identical call was already in flight; this caller waits on it |
+| **MISS** | one | full, on a shaped prompt | genuinely new work |
+
+A hit is **never** reported as a model call. Mixing calls that never happened
+into escalation rates, failure rates and latency percentiles corrupts the very
+numbers you would use to decide what to tune next, so savings are counted in the
+ledger instead.
+
 ## What it does
 
 | Component | Problem it solves |
