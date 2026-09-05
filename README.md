@@ -26,12 +26,15 @@ your app  ->  your routing/tiering layer  ->  tokentuner  ->  openai / openroute
 ## Install
 
 ```bash
-pip install tokentuner                # from PyPI
-pip install "tokentuner[all]"         # + tiktoken, pymongo, redis
+# Pinned to a tag, so an upgrade is always a deliberate edit:
+pip install "tokentuner @ git+https://github.com/jigarmistry/tokentuner.git@v0.1.0"
 
-# or straight from GitHub, pinned to a tag:
-pip install "git+https://github.com/<owner>/tokentuner.git@v0.1.0"
+# With the optional extras:
+pip install "tokentuner[all] @ git+https://github.com/jigarmistry/tokentuner.git@v0.1.0"
 ```
+
+Not on PyPI yet — install from the tag above, or vendor the `tokentuner/`
+directory, which works just as well since there is nothing to resolve.
 
 Zero required dependencies. `tiktoken` gives exact token counts; without it the
 built-in estimator is used, which deliberately over-counts so budgets under-fill
