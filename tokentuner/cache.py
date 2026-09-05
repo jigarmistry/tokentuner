@@ -6,7 +6,7 @@ cache that stores everything is easy to write and produces wrong answers:
 
   * High temperature means the caller asked for variety. Returning a previous
     answer removes exactly the thing they asked for, and it does so invisibly -
-    the outreach message that is word-for-word identical every time looks like
+    a "regenerate" button that returns the same draft word for word looks like
     a model quirk, not like a cache.
 
   * Failed and escalated-away answers are never stored. Caching a failure turns
